@@ -17,7 +17,9 @@ int main(int argc, char * argv[]) {
     remove_spaces(exp);
     pToken head = NULL;
     head = tokener_string(exp);
-    print_list_token(head);
+    syntax_checker(head);
+    //print_list_token(head);
+    print_list_status_msgs(head);
     destroy_list_token(head);
     return 0;
 }

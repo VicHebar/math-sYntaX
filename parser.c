@@ -1,4 +1,5 @@
 #include "parser.h"
+#include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -7,13 +8,11 @@
 enum token_kind get_single_char_kind(char * head, char *c) {
     enum token_kind token;
     enum token_kind prev_kind = null_token;
-    enum token_kind next_kind = null_token;
-    char prev_char = '\0', next_char = '\0';
     if(*c >= 48 && *c <= 57)
         token = num;
     else if(*c == '.')
         token = num;
-    else if(*c >= 97 && *c <= 122) 
+    else if((*c >= 97 && *c <= 122) || (*c >= 65 && *c <= 90) || *c == 95) 
         token = var;
     else if(*c == '*')
         token = mult;
@@ -96,6 +95,8 @@ pToken new_void_list_token() {
     pToken temp = malloc(sizeof(Token));
     temp->content = NULL;
     temp->kind = null_token;
+    temp->msgs_quantity = 0;
+    temp->msgs = NULL;
     temp->next = NULL;
     return temp;
 }
@@ -105,6 +106,11 @@ pToken new_list_token(Token token) {
     token_pointer->content = malloc(strlen(token.content) + 1);
     strcpy(token_pointer->content, token.content);
     token_pointer->kind = token.kind;
+    token_pointer->msgs_quantity = token.msgs_quantity;
+    if(token.msgs_quantity > 0) {
+        token_pointer->msgs = malloc(sizeof(enum token_status)*token.msgs_quantity);
+        memcpy(token_pointer->msgs, token.msgs, sizeof(enum token_status));
+    }
     token_pointer->next = NULL;
     return token_pointer;
 }
@@ -122,8 +128,27 @@ int add_node_token_list(pToken *head,  pToken node) {
     return 1;
 }
 
+bool set_token_status(pToken token, enum token_status status) {
+    if(token->msgs_quantity == 0) {
+        token->msgs = malloc(sizeof(enum token_status));
+        if(!token->msgs) return false;
+        *(token->msgs) = status;
+        token->msgs_quantity++;
+    } else {
+        enum token_status * ptr;
+        token->msgs_quantity++;
+        ptr = realloc(token->msgs, token->msgs_quantity * sizeof(enum token_status));
+        if(!ptr) return false;
+        token->msgs = ptr;
+        token->msgs[(token->msgs_quantity)-1] = status;
+    }
+    return true;
+}
+
 void free_pToken(pToken token) {
     free(token->content);
+    if(token->msgs_quantity > 0)
+        free(token->msgs);
     free(token);
 }
 
@@ -194,11 +219,80 @@ char * token_kind_to_string(enum token_kind kind) {
     return string_kind;
 }
 
+char * token_status_to_string(enum token_status status) {
+    char * msg = malloc(30);
+    switch (status) {
+        case too_many_points:
+            strcpy(msg, "too_many_points");
+            break;
+        case no_number:
+            strcpy(msg, "no_number");
+            break;
+        case missing_infix_operator:
+            strcpy(msg, "missing_infix_operator");
+            break;
+        case missing_left_operand:
+            strcpy(msg, "missing_left_operand");
+            break;
+        case missing_right_operand:
+            strcpy(msg, "missing_right_operand");
+            break;
+        case missing_left_parenthesis:
+            strcpy(msg, "missing_left_parenthesis");
+            break;
+        case missing_right_parenthesis:
+            strcpy(msg, "missing_right_parenthesis");
+            break;
+        case empty_expression:
+            strcpy(msg, "empty_expression");
+            break;
+        case left_parenthesis_found:
+            strcpy(msg, "left_parenthesis_found");
+            break;
+        case right_parenthesis_found:
+            strcpy(msg, "right_parenthesis_found");
+            break;
+        case no_error:
+            strcpy(msg, "no_error");
+            break;
+        case null_token_error:
+            strcpy(msg, "null_token_error");
+            break;
+        default:
+            strcpy(msg, "unknown");
+    }
+    return msg;
+}
+
 void print_list_token(pToken to_print) {
     char * kind;
     while (to_print) {
         kind = token_kind_to_string(to_print->kind);
         printf("[\'%s\', %s] . ", to_print->content, kind);
+        free(kind);
+        to_print = to_print->next;
+    }
+}
+
+void print_list_status_msgs(pToken to_print) {
+    char * status;
+    char * kind;
+    while (to_print) {
+        int status_i = 0;
+        kind = token_kind_to_string(to_print->kind);
+        printf("Token: %s\nKind: %s\n", to_print->content, kind);
+        if(to_print->msgs_quantity > 0) {
+            printf("STATUS MSGS: \n");
+            while (status_i < to_print->msgs_quantity) {
+                status = token_status_to_string(to_print->msgs[status_i]);
+                printf("\t%d. %s\n", status_i, status);
+                free(status);
+                status_i++;
+            }
+        } else {
+            printf("NO STATUS MSGS.\n");
+        }
+        printf("\n");
         free(kind);
         to_print = to_print->next;
     }
@@ -211,4 +305,124 @@ void remove_spaces(char * string) {
     for( char * p = strtok(string, " "); p != NULL; p = strtok(NULL, " "))
         strcat(temp_string, p);
     strcpy(string, temp_string);
+    free(temp_string);
 }
+
+bool find_token_status(Token token, enum token_status status) {
+    if(token.msgs_quantity == 0)
+        return false;
+    int msg_i = 0;
+    while (msg_i < token.msgs_quantity) {
+        if(token.msgs[msg_i] == status)
+            return true;
+        msg_i++;
+    }
+    return false;
+}
+
+void syntax_checker_lPar(pToken token) {
+    pToken pList = token->next;
+    int balance = 1;
+    while(pList) {
+        if(pList->kind == lPar)
+            balance++;
+        if(pList->kind == rPar)
+            balance--;
+        if(balance == 0)
+            break;
+        pList = pList->next;
+    }
+    if(balance != 0){
+        if(!set_token_status(token, missing_right_parenthesis))
+            printf("\nError agregando error \"missing_right_parenthesis\"\n");
+    } else {
+        if(!set_token_status(token, right_parenthesis_found))
+            printf("\nError agregando status \"rPar_found\"\n");
+        if(!set_token_status(pList, left_parenthesis_found))
+            printf("\nError agregando status \"rPar_found\"\n");
+        if(token->next){
+            if(token->next->kind == rPar)
+                if(!set_token_status(token, empty_expression))
+                    printf("\nError agregando error \"empty_expression\"\n");
+        }
+    }
+    if(token->next){
+        if(token->next->kind >= mult && token->next->kind <= exp){
+            if(!set_token_status(token, missing_left_operand))
+                printf("\nError agregando error \"missing_left_operand\"\n");
+        }
+    }
+}
+
+void syntax_checker_rPar(pToken token) {
+    if(!find_token_status(*token, left_parenthesis_found)) {
+        if(!set_token_status(token, missing_left_parenthesis))
+            printf("\nError agregando status \"missing_left_parenthesis\"\n");
+    }
+    if(token->next){
+        if(token->next->kind >= sin && token->next->kind <= num) {
+            if(!set_token_status(token, missing_infix_operator))
+                printf("\nError agregando status \"missing_infix_operator\"\n");
+    }
+    }
+}
+
+void syntax_checker(pToken head) {
+    pToken pList = head;
+
+    while (pList) {
+        if(pList->kind == num) {
+            char *p = pList->content;
+            int points_q = 0;
+            int numbers_q = 0;
+            while (*p){
+                if(*p == '.')
+                    points_q++;
+                if(*p >= 48 && *p <= 57)
+                    numbers_q++;
+                p++;
+            }
+            if(points_q > 1)
+                if(!set_token_status(pList, too_many_points))
+                    printf("\nError agregando error \"too_many_points\"\n");
+            if(numbers_q == 0)
+                if(!set_token_status(pList, no_number))
+                    printf("\nError agregando error \"no_number\"\n");
+            if(pList->next) {
+                if(pList->next->kind >= lPar && pList->next->kind <= num && pList->next->kind != rPar)
+                    if(!set_token_status(pList, missing_infix_operator))
+                        printf("\nError agregando error \"missing_infix_operator\"\n");
+            }
+        } else if(pList->kind == var) {
+            if(pList->next) {
+                if(pList->next->kind >= lPar && pList->next->kind <= num)
+                    if(!set_token_status(pList, missing_infix_operator))
+                        printf("\nError agregando error \"missing_infix_operator\"\n");
+            }
+        } else if(pList->kind >= mult && pList->kind <= exp) {
+            if(pList == head) {
+                if(!set_token_status(pList, missing_left_operand))
+                    printf("\nError agregando error \"missing_left_operand\"\n");
+            }
+            if(pList->next){
+                if(pList->next->kind >= mult && pList->next->kind <= exp)
+                    if(!set_token_status(pList, missing_right_operand))
+                        printf("\nError agregando error \"missing_right_operand\"\n");
+            } else {
+                if(!set_token_status(pList, missing_right_operand))
+                    printf("\nError agregando error \"missing_right_operand\"\n");
+            }
+        } else if(pList->kind >= sin && pList->kind <= tan) {
+            if(pList->next->kind != lPar)
+                if(!set_token_status(pList, missing_left_parenthesis))
+                        printf("\nError agregando error \"missing_left_parenthesis\"\n");
+        } else if(pList->kind == lPar) {
+            syntax_checker_lPar(pList);
+        } else if(pList->kind == rPar) {
+            syntax_checker_rPar(pList);
+        }
+        pList = pList->next;
+    }
+}
+
+
