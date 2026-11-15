@@ -14,6 +14,7 @@ int main(int argc, char * argv[]) {
     }
     char * exp = malloc(strlen(argv[1])+1);
     strcpy(exp,argv[1]);
+    remove_spaces(exp);
     pToken head = NULL;
     head = tokener_string(exp);
     print_list_token(head);

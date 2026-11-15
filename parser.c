@@ -203,3 +203,12 @@ void print_list_token(pToken to_print) {
         to_print = to_print->next;
     }
 }
+
+void remove_spaces(char * string) {
+    char * temp_string = NULL;
+    temp_string = malloc(strlen(string) + 1);
+    *temp_string = '\0';
+    for( char * p = strtok(string, " "); p != NULL; p = strtok(NULL, " "))
+        strcat(temp_string, p);
+    strcpy(string, temp_string);
+}

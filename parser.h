@@ -42,5 +42,6 @@ int add_node_token_list(pToken *, pToken); //Agrega un nuevo nodo previamente cr
 void destroy_list_token(pToken);
 void free_pToken(pToken);
 void print_list_token(pToken);
+void remove_spaces(char *);
 
 char * token_kind_to_string(enum token_kind);
