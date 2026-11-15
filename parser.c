@@ -8,18 +8,11 @@ enum token_kind get_single_char_kind(char * head, char *c) {
     enum token_kind token;
     enum token_kind prev_kind = null_token;
     enum token_kind next_kind = null_token;
+    char prev_char = '\0', next_char = '\0';
     if(*c >= 48 && *c <= 57)
         token = num;
-    else if(*c == '.') {
-        if(c != head)
-            prev_kind = get_single_char_kind(head, c-1);
-        if(*c != '\0')
-            next_kind = get_single_char_kind(head, c+1);
-        if(prev_kind != num || next_kind != num)
-            token = error_;
-        else
-            token = num;
-    }
+    else if(*c == '.')
+        token = num;
     else if(*c >= 97 && *c <= 122) 
         token = var;
     else if(*c == '*')
@@ -31,11 +24,9 @@ enum token_kind get_single_char_kind(char * head, char *c) {
     else if(*c == '-') {
         if(c != head)
             prev_kind = get_single_char_kind(head, c-1);
-        if(c == head || prev_kind == mult || prev_kind == divs || 
-                prev_kind == sum || prev_kind == res || prev_kind == neg ||
-                prev_kind == exp || prev_kind == lPar) {
+        if(c == head || prev_kind <= lPar) {
             token = neg;
-        } else if(prev_kind == num || prev_kind == var || prev_kind == rPar)
+        } else if(prev_kind >= rPar && prev_kind <= num)
             token = res;
     } else if(*c == '^')
         token = exp;
