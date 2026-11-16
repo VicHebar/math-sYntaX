@@ -1,4 +1,5 @@
 #include "parser.h"
+#include <string.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -109,7 +110,7 @@ pToken new_list_token(Token token) {
     token_pointer->msgs_quantity = token.msgs_quantity;
     if(token.msgs_quantity > 0) {
         token_pointer->msgs = malloc(sizeof(enum token_status)*token.msgs_quantity);
-        memcpy(token_pointer->msgs, token.msgs, sizeof(enum token_status));
+        memcpy(token_pointer->msgs, token.msgs, token.msgs_quantity * sizeof(enum token_status));
     }
     token_pointer->next = NULL;
     return token_pointer;
@@ -425,4 +426,155 @@ void syntax_checker(pToken head) {
     }
 }
 
+char * error_msg_generator(pToken head) {
+    int multip_50 = 1;
+    char * msg = malloc(multip_50*50);
+    pToken pList = head;
+    *msg = '\0';
+    while(pList) {
+        if(pList->msgs_quantity > 0) {
+            int msg_i = 0;
+            int error_msg_size = strlen(msg);
+            while (msg_i < pList->msgs_quantity) {
+                
+                msg_i++;
+            }
+        }
+        pList = pList->next;
+    }
+    return msg;
+}
 
+void copy_token(Token * Dest, Token Src) {
+    Dest->kind           = Src.kind;
+    Dest->msgs_quantity  = Src.msgs_quantity;
+    if(Src.msgs_quantity > 0) {
+        Dest->msgs = malloc(Src.msgs_quantity * sizeof(enum token_status));
+        memcpy(Dest->msgs, Src.msgs, Src.msgs_quantity * sizeof(enum token_status));
+    }
+    if(Src.content) {
+        Dest->content = malloc(strlen(Src.content));
+        strcpy(Dest->content, Src.content);
+    }
+}
+
+pArbol new_node(Token token, pArbol left, pArbol right) {
+    pArbol tree = malloc(sizeof(Arbol));
+    if(!tree) return NULL;
+    copy_token(&tree->token, token);
+    tree->left  = left;
+    tree->right = right;
+    return tree;
+}
+
+pArbol parse_exp(pToken * pList) {
+    pArbol left = parse_term(pList);
+
+    while(*pList != NULL && ((*pList)->kind == sum || (*pList)->kind == res)) {
+        pToken operator = *pList;
+        *pList = operator->next;
+        pArbol right = parse_term(pList);
+        left = new_node(*operator, left, right);
+    }
+    return left;
+}
+
+pArbol parse_term(pToken * pList) {
+    pArbol left = parse_fact(pList);
+
+    while (*pList != NULL && ((*pList)->kind == mult || (*pList)->kind == divs)) {
+        pToken operator = *pList;
+        *pList = operator->next;
+        pArbol right = parse_fact(pList);
+        left = new_node(*operator, left, right);
+    }
+    return left;
+}
+
+pArbol parse_fact(pToken * pList) {
+    pToken token = *pList;
+    if(token == NULL) return NULL;
+    if(token->kind == neg) {
+        *pList = token->next;
+        pArbol operand = parse_fact(pList);
+        return new_node(*token, operand, NULL);
+    }
+    if(token->kind == num || token->kind == var) {
+        *pList = token->next;
+        return new_node(*token, NULL, NULL);
+    }
+    if(token->kind == lPar) {
+        *pList = token->next;
+        pArbol exp = parse_exp(pList);
+        *pList = (*pList)->next;
+        return exp;
+    }
+    return NULL;
+}
+
+void print_parse_tree(pArbol tree) {
+    if(!tree) return;
+    if(tree->token.kind != num && tree->token.kind != var)
+        putchar('(');
+    if(tree->token.kind != neg) {
+        print_parse_tree(tree->left);
+        printf("%s", tree->token.content);
+        print_parse_tree(tree->right);
+    } else {
+        printf("%s", tree->token.content);
+        print_parse_tree(tree->left);
+    }
+    if(tree->token.kind != num && tree->token.kind != var)
+        putchar(')');
+}
+
+double eval_parse_tree(pArbol tree, Variable vars[], int vars_q) {
+    char * stop;
+    double left_val;
+    double right_val;
+    double val;
+    int var_i = 0;
+    if(tree->left)
+        left_val = eval_parse_tree(tree->left, vars, vars_q);
+    if(tree->right)
+        right_val = eval_parse_tree(tree->right, vars, vars_q);
+    switch (tree->token.kind) {
+        case mult:
+            val = left_val * right_val;
+            break;
+        case divs:
+            val = left_val / right_val;
+            break;
+        case sum:
+            val = left_val + right_val;
+            break;
+        case res:
+            val = left_val - right_val;
+            break;
+        case neg:
+            val = -1.0*left_val;
+            break;
+        case num:
+            val = strtod(tree->token.content, &stop);
+            break;
+        case var:
+            if(vars == NULL || vars_q == 0) {
+                val = 0.0;
+                break;
+            }
+            while (var_i < vars_q) {
+                if(strcmp(vars[var_i].name, tree->token.content) == 0) {
+                    val = vars[var_i].val;
+                    break;
+                }
+                var_i++;
+            }
+            if(var_i == vars_q)
+                val = 0;
+            break;
+        default:
+            val = 0.0;
+            break;
+    }
+    return val;
+}
