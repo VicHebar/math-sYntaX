@@ -482,7 +482,7 @@ pArbol parse_exp(pToken * pList) {
 pArbol parse_term(pToken * pList) {
     pArbol left = parse_fact(pList);
 
-    while (*pList != NULL && ((*pList)->kind == mult || (*pList)->kind == divs)) {
+    while (*pList != NULL && ((*pList)->kind == mult || (*pList)->kind == divs || (*pList)->kind == exp)) {
         pToken operator = *pList;
         *pList = operator->next;
         pArbol right = parse_fact(pList);

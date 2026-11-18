@@ -40,8 +40,8 @@ int main(int argc, char * argv[]) {
     head = tokener_string(exp);
     tokens = head;
     syntax_checker(head);
-    //print_list_token(head);
-    //print_list_status_msgs(head);
+    // print_list_token(head);
+    // print_list_status_msgs(head);
     tree = parse_exp(&tokens);
     print_parse_tree(tree);
     
